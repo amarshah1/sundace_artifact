@@ -58,7 +58,7 @@ clone_at() {  # url dir commit
   fi
   echo "$2 @ $(git -C "$2" rev-parse HEAD)"
 }
-count() { find "$1" -name '*.smt2' 2>/dev/null | wc -l; }
+count() { [ -d "$1" ] || { echo 0; return; }; find "$1" -name "*.smt2" | wc -l; }
 
 if want verus; then
   clone_at https://github.com/amarshah1/verus_benchmarks.git "$root/verus_benchmarks" \

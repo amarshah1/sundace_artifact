@@ -139,6 +139,14 @@ def main():
     set_files = [x for x in set_files if x[2]]   # e.g. no Dafny files when only an F* tarball was fetched
 
     L = []
+    for b in manifests:  # runs made with --manifests on a partial download
+        info = root / "manifests" / f"{b}.json"
+        if info.exists():
+            m = __import__("json").loads(info.read_text())
+            if m["present"] < m["listed"]:
+                L.append(f"PARTIAL: {b}: {m['present']:,} of the {m['listed']:,} listed queries (the rest were not downloaded)")
+    if L:
+        L.append("")
     if a.modularity_ablation:
         L += ABLATION_HEADER + [
             f"Run folder: {short_path(root)}/",

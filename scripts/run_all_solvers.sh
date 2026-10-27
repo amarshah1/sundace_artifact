@@ -4,4 +4,4 @@
 # 60 s per query, same flags as the paper's run.
 #   run_all_solvers.sh [-j N] [--only verus verus_heldout mariposa] [--sample N] [--manifests DIR] [--out DIR]
 # Default output: $RESULTS_ROOT/paper (shared with run_sundance_configs.sh, so the Default config runs once).
-exec python3 "$(dirname "$0")/lib/driver.py" --suite solvers "$@"
+DRIVER_PROG=run_all_solvers.sh exec python3 "$(dirname "$0")/lib/driver.py" --suite solvers "$@"

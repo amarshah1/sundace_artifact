@@ -15,4 +15,4 @@ jobs=(); [ -n "$j" ] && jobs=(-j "$j")
 echo
 echo "Summary (unsat = solved; timeout = no answer within $t s; other/error = the solver failed on that query):"
 for f in "$out"/results/*/*_results.txt; do echo "  $(basename "$(dirname "$f")")/$(basename "$f" _results.txt): $(grep -E '^SUMMARY' "$f" | cut -d' ' -f2-)"; done
-echo "Tables: $out/tables/   Plots: $out/plots/"
+echo "Tables: $out/tables/   Plots: $out/plots/   (with run.sh, /results is ./results on your machine)"

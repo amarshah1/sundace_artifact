@@ -359,7 +359,8 @@ def process_one(args):
     try:
         return _process_one(args)
     except Exception as e:  # e.g. disk full while writing a proof: record it, keep the other jobs running
-        return args[0], 'error', 0.0, "", "", {'detail': f"runner exception: {type(e).__name__}: {e}"[:200]}
+        return args[0], 'error', 0.0, "", "", {'detail': f"runner exception: {type(e).__name__}: {e}"[:200],
+                                               'runner_exception': 1}
 
 
 def _process_one(args):
@@ -425,13 +426,31 @@ def available_cpus() -> int:
         n = len(os.sched_getaffinity(0))
     except AttributeError:
         n = os.cpu_count() or 1
-    try:
+    try:  # cgroup v2
         quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
         if quota != "max":
             n = min(n, max(1, int(int(quota) / int(period))))
     except (OSError, ValueError):
-        pass
+        try:  # cgroup v1
+            quota = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text())
+            period = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text())
+            if quota > 0 and period > 0:
+                n = min(n, max(1, quota // period))
+        except (OSError, ValueError):
+            pass
     return max(1, n)
+
+
+def file_sha256(path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    try:
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+    except OSError:
+        return ""
+    return h.hexdigest()
 
 
 def list_files(folder: Path) -> List[Path]:
@@ -492,7 +511,8 @@ def main():
     proofs = str(Path(a.proofs_dir) / a.run_name) if a.proofs_dir else None
     out_dir = Path(a.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    txt = open(out_dir / f"{a.run_name}_results.txt", "w")
+    progress = out_dir / f"{a.run_name}_results.progress.jsonl"
+    txt = open(out_dir / f"{a.run_name}_results.txt", "a" if progress.exists() else "w")
 
     def log(msg):
         txt.write(msg + "\n")
@@ -508,9 +528,8 @@ def main():
     t0 = time.time()
     # Progress file: one JSON line per finished query, so an interrupted run resumes where it stopped.
     # Its first line records the settings; a progress file from other settings is discarded.
-    settings = {"solver": solver, "kind": a.kind, "timeout": a.timeout, "grace": a.grace,
-                "files": len(files), "proofs": bool(proofs)}
-    progress = out_dir / f"{a.run_name}_results.progress.jsonl"
+    settings = {"solver": solver, "solver_sha256": file_sha256(shlex.split(solver)[0]), "kind": a.kind,
+                "timeout": a.timeout, "grace": a.grace, "files": len(files), "proofs": bool(proofs)}
     done: Dict[str, Tuple[str, float, Dict[str, Any]]] = {}
     if progress.exists():
         lines = progress.read_text().splitlines()
@@ -522,9 +541,9 @@ def main():
                     except ValueError:
                         continue  # torn last line
                     done[r["file"]] = (r["result"], r["time"], r["stats"])
-                log(f"Resuming: {len(done)} of {len(files)} queries already done")
+                log(f"Resuming: {len(done)} of {len(files)} queries already done (now with -j {a.jobs})")
             else:
-                log("Discarding a progress file from a run with other settings")
+                log("Discarding a progress file from a run with other settings (solver binary, flags or timeout)")
         except ValueError:
             pass
     if not done:
@@ -538,18 +557,28 @@ def main():
             counts[cat] = counts.get(cat, 0) + 1
     jobs = [(f, folder, solver, a.timeout, proofs, a.kind, opts) for f in files
             if str(f.relative_to(folder)) not in done]
-    killed = 0
-    with open(progress, "a") as pf, mp.Pool(processes=max(1, a.jobs)) as pool:
+    killed = runner_errors = 0
+    if progress.read_bytes()[-1:] not in (b"", b"\n"):
+        with open(progress, "a") as pf:
+            pf.write("\n")   # a torn last line from a kill: start the next record on its own line
+    try:
+      with open(progress, "a") as pf, mp.Pool(processes=max(1, a.jobs)) as pool:
         for i, (f, cat, t, _, _, stats) in enumerate(pool.imap_unordered(process_one, jobs), len(rows) + 1):
             rows.append((f, cat, t, stats))
             counts[cat] = counts.get(cat, 0) + 1
             killed += "killed by signal" in str(stats.get('detail', ''))
-            pf.write(json.dumps({"file": str(f.relative_to(folder)), "result": cat, "time": t,
-                                 "stats": stats}) + "\n")
-            pf.flush()
+            if stats.get('runner_exception'):
+                runner_errors += 1   # not saved: such queries are retried on the next run
+            else:
+                pf.write(json.dumps({"file": str(f.relative_to(folder)), "result": cat, "time": t,
+                                     "stats": stats}) + "\n")
+                pf.flush()
             extra = (" " + " ".join(f"{k}={v}" for k, v in stats.items()
                                     if not str(k).startswith("per_round"))) if stats else ""
             log(f"[{i}/{len(files)}] {f.relative_to(folder)} -> {cat.upper()} [{t:.2f}s]{extra[:400]}")
+    except KeyboardInterrupt:
+        log(f"\ninterrupted after {len(rows)} of {len(files)} queries; rerun the same command to resume")
+        sys.exit(130)
     log(f"\nProcessing completed in {time.time() - t0:.2f} seconds")
     log("SUMMARY " + " ".join(f"{k}={v}" for k, v in sorted(counts.items())) + f" total={len(files)}")
     if killed:
@@ -568,9 +597,15 @@ def main():
         for f, cat, t, s in sorted(rows, key=lambda r: str(r[0])):
             w.writerow([str(f.relative_to(folder)), cat, f"{t:.2f}"] + [s.get(k, "") for k in keys])
     os.replace(tmp, csv_path)
+    meta = out_dir / f"{a.run_name}_results.json"
+    if runner_errors:  # not finished: the next run retries these queries
+        remove_if_exists(meta)
+        log(f"ERROR: {runner_errors} queries failed in the runner itself (see 'runner exception' above, e.g. a full "
+            "disk); fix the cause and rerun to retry them")
+        sys.exit(2)
     # Written last: the driver treats a run as finished only if this file matches the CSV.
-    (out_dir / f"{a.run_name}_results.json").write_text(json.dumps(
-        dict(settings, rows=len(rows), counts=counts, killed_by_signal=killed, finished=time.time())) + "\n")
+    meta.write_text(json.dumps(dict(settings, rows=len(rows), counts=counts, killed_by_signal=killed,
+                                    jobs=a.jobs, finished=time.time())) + "\n")
     remove_if_exists(progress)
 
 

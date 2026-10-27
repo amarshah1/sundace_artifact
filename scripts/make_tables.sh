@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The paper's result tables (the comment blocks in sections/8-evaluation.tex), from a results directory.
+# The paper's result tables (Sec. 8), from a results directory.
 #   make_tables.sh [RESULTS_DIR]   (default $RESULTS_ROOT/paper) -> RESULTS_DIR/tables/{solvers,modularity_ablation}.txt
 # Solved = unsat within 1 / 10 / 60 s (or up to the run's timeout); the 1,187 duplicate Verus queries are dropped.
 set -euo pipefail

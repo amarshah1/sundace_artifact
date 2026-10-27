@@ -33,7 +33,18 @@ What you should see:
   - `unsat` means solved; `timeout` means no answer within the time limit.
   - `other` or `error` means the solver failed on that query. One Verus query (`verismo/tspec_e__array.smt2`), if sampled, does this for Sundance, cvc5 and Alt-Ergo, as in the paper.
   - Tables and plots go to `results/smoke_n5_t10/`.
-- **`make_paper_tables.sh`:** writes the paper's tables and figures to `results/paper_run/` in seconds. It uses the per-query results of the paper's own run, shipped in `paper_results/`. The numbers match `sections/8-evaluation.tex`.
+- **`make_paper_tables.sh`:** writes the paper's tables and figures to `results/paper_run/` in seconds. It uses the per-query results of the paper's own run, shipped in `paper_results/`. Its summary rows are the paper's numbers (% of queries solved within 60 s):
+
+  | | Verus | Verus held-out | Dafny | F\* |
+  |---|---:|---:|---:|---:|
+  | Sundance (proofs) | 83.0 | 90.2 | 73.7 | 56.7 |
+  | Z3, tool options | 99.8 | 99.8 | 98.0 | 97.8 |
+  | Z3, tool options (proofs) | 91.8 | 97.7 | 66.5 | 97.7 |
+  | cvc5 (proofs) | 88.4 | 95.3 | 69.8 | 54.9 |
+  | Alt-Ergo | 79.8 | 82.8 | 70.4 | 59.3 |
+  | Sundance, Semper e-graph | 75.7 | 81.7 | 56.9 | 54.7 |
+  | Sundance, MiniSat | 79.2 | 86.1 | 70.4 | 49.5 |
+  | Sundance, Z3 arithmetic | 81.9 | 88.3 | 70.5 | 50.5 |
 
 ## `run.sh`
 
@@ -75,16 +86,17 @@ Options of `run_all_solvers.sh` and `run_sundance_configs.sh` (see `--help`):
 
 | option | meaning |
 |---|---|
-| `--only SET` | `verus`, `verus_heldout` or `mariposa` (Dafny/F\*); repeatable |
+| `--only SET` | `verus`, `verus_heldout` (or `heldout`) or `mariposa` (or `dafny_fstar`); repeatable |
 | `--configs NAME…` | only these configs (names below) |
 | `--sample N` | N random queries per set (Dafny and F\* separately) |
 | `--timeout S` | per-query time limit (default 60) |
 | `-j N` | parallel queries (default: all CPUs available to the container) |
 | `--manifests DIR` | the paper's file lists; files that are not downloaded are skipped with a warning |
-| `--out DIR` | output folder (default `/results/paper`, or `/results/sample<N>_t<S>` for `--sample`/`--timeout` runs) |
+| `--out DIR` | output folder (default `/results/paper` for the full paper run; other settings get their own folder, e.g. `/results/sample10_t60`) |
 
-- **Resuming:** rerunning a command resumes it. Finished runs are skipped, and an interrupted run continues from its last finished query.
-- **Settings are fixed per output folder.** An output folder made with other settings (timeout, sample, file lists) is refused. To start over, delete the folder or pick another `--out`.
+- **Checks:** before running, each config's command line is tried on a trivial query; a solver that fails it is reported and skipped.
+- **Resuming:** rerunning a command (for example after Ctrl-C) resumes it. Finished runs are skipped, and an interrupted run continues from its last finished query. A run is redone if the solver binary changed.
+- **Settings are fixed per output folder.** An output folder made with other settings (timeout, sample, file lists), or made before more of the listed files were downloaded, is refused. To start over, delete the folder or pick another `--out`. Tables of runs on a partial download say `PARTIAL`.
 - **Failures:** if a solver does not start or a run fails, the command exits non-zero and says which run failed.
 - **Output files:** results are in `results/<out>/results/<set>/<config>_results.csv`, one row per query.
 

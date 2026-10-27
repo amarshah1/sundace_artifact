@@ -24,7 +24,8 @@ export Z3_SYS_Z3_HEADER=/opt/z3-4.13.4/include/z3.h
 export RUSTFLAGS="-L /opt/z3-4.13.4/lib"
 cargo build --release --no-default-features --features "$features" "${locked[@]}"
 mkdir -p /opt/sundance/bin /opt/sundance/info
-install -s -m 755 target/release/sundance-smt /opt/sundance/bin/sundance-smt   # -s: drop debug info only
+install -m 755 target/release/sundance-smt /opt/sundance/bin/sundance-smt
+strip --strip-debug /opt/sundance/bin/sundance-smt   # drop debug info, keep symbols for panic backtraces
 cp LICENSE NOTICE /opt/sundance/ 2>/dev/null || cp LICENSE /opt/sundance/
 {
   echo "repo=$repo"

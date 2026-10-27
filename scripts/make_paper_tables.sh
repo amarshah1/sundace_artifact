@@ -7,7 +7,10 @@ set -euo pipefail
 case ${1:-} in -h|--help) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;; esac
 here=$(cd "$(dirname "$0")" && pwd); src=$here/../paper_results
 out=${1:-${RESULTS_ROOT:-/results}/paper_run}
-mkdir -p "$out/manifests"
+if [ -e "$out" ] && [ ! -e "$out/.paper_run" ] && [ -n "$(ls -A "$out" 2>/dev/null)" ]; then
+  echo "make_paper_tables.sh: $out already holds other results; choose an empty or new folder" >&2; exit 1
+fi
+mkdir -p "$out/manifests"; touch "$out/.paper_run"
 cp "$here/../manifests/paper/"*.txt "$out/manifests/"
 for b in verus verus_heldout mariposa; do
   mkdir -p "$out/results/$b"
@@ -15,4 +18,5 @@ for b in verus verus_heldout mariposa; do
 done
 echo '{"timeout": 60, "sample": 0, "seed": null, "manifests": "paper run"}' > "$out/run_settings.json"
 "$here/make_tables.sh" "$out" 2> >(grep -v "^note: " >&2)
-"$here/make_plots.sh" "$out" > /dev/null 2>&1 && echo "plots in $out/plots"
+"$here/make_plots.sh" "$out" > "$out/plots.log" 2>&1 || { tail -20 "$out/plots.log" >&2; exit 1; }
+echo "plots in $out/plots"

@@ -5,4 +5,4 @@
 #   sundance-sat-minisat     --arithmetic internalincremental --sat-backend minisat   (no proofs)
 #   sundance-arith-z3-proof  --arithmetic z3incremental                               (proofs)
 # Semper (the e-graph swap) is not on Sundance main yet.
-exec python3 "$(dirname "$0")/lib/driver.py" --suite sundance-configs "$@"
+DRIVER_PROG=run_sundance_configs.sh exec python3 "$(dirname "$0")/lib/driver.py" --suite sundance-configs "$@"
