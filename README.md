@@ -23,8 +23,9 @@ docker buildx build --load -t sundance-artifact .
 # sundanceartifactexperiment), rename it so that run.sh finds it:
 #   docker tag sundanceartifactexperiment sundance-artifact
 ./run.sh fetch_benchmarks.sh --only verus --only heldout --only dafny_fstar --asset UFLIA-fs_vwasm.tar.xz /benchmarks
-./run.sh smoke_test.sh 5 10 4          # 5 queries per set, 10 s timeout, 4 parallel jobs
-./run.sh make_paper_tables.sh          # the paper's tables and figures from the paper's raw results
+./run.sh smoke_test.sh 5 10 4                     # 5 queries per set, 10 s timeout, 4 parallel jobs
+./run.sh make_tables.sh /results/smoke_n5_t10     # tables from that run
+./run.sh make_plots.sh /results/smoke_n5_t10      # figures from that run
 ```
 
 What you should see:
@@ -36,18 +37,10 @@ What you should see:
   - `unsat` means solved; `timeout` means no answer within the time limit.
   - `other` or `error` means the solver failed on that query. One Verus query (`verismo/tspec_e__array.smt2`), if sampled, does this for Sundance, cvc5 and Alt-Ergo, as in the paper.
   - Tables and plots go to `results/smoke_n5_t10/`.
-- **`make_paper_tables.sh`:** writes the paper's tables and figures to `results/paper_run/` in seconds. It uses the per-query results of the paper's own run, shipped in `paper_results/`. Its summary rows are the paper's numbers (% of queries solved within 60 s):
-
-  | | Verus | Verus held-out | Dafny | F\* |
-  |---|---:|---:|---:|---:|
-  | Sundance (proofs) | 83.0 | 90.2 | 73.7 | 56.7 |
-  | Z3, tool options | 99.8 | 99.8 | 98.0 | 97.8 |
-  | Z3, tool options (proofs) | 91.8 | 97.7 | 66.5 | 97.7 |
-  | cvc5 (proofs) | 88.4 | 95.3 | 69.8 | 54.9 |
-  | Alt-Ergo | 79.8 | 82.8 | 70.4 | 59.3 |
-  | Sundance, Semper e-graph | 75.7 | 81.7 | 56.9 | 54.7 |
-  | Sundance, MiniSat | 79.2 | 86.1 | 70.4 | 49.5 |
-  | Sundance, Z3 arithmetic | 81.9 | 88.3 | 70.5 | 50.5 |
+- **Tables and figures:** `results/smoke_n5_t10/tables/solvers.txt` (the solver comparison, RQ1/RQ2) and
+  `modularity_ablation.txt` (the Sundance configurations, RQ3), with the share of queries each config solved within
+  1 s and 10 s (up to the run's timeout), by set and by project; the CDF plots are in `results/smoke_n5_t10/plots/`.
+  (`smoke_test.sh` also makes them itself.) The same two commands work on any run's output folder.
 
 ## `run.sh`
 
@@ -78,6 +71,7 @@ prompt inside the shell may read `I have no name!`. That is harmless.
 
 | eval | command | time* |
 |---|---|---|
+| Download all benchmarks (do this first) | `./run.sh fetch_benchmarks.sh /benchmarks` (about 3 GB to download, 77 GB on disk) | ~15 min, depending on your connection |
 | Solver comparison (RQ1/RQ2) | `./run.sh run_all_solvers.sh --manifests /artifact/manifests/paper -j N` | ~4.5 h |
 | Sundance configurations (RQ3) | `./run.sh run_sundance_configs.sh --manifests /artifact/manifests/paper -j N` | ~4 h more |
 | Tables and figures from your run | `./run.sh make_tables.sh RUN` and `./run.sh make_plots.sh RUN` (RUN: the run's output folder, default `/results/paper`) → `results/<run>/{tables,plots}/` | seconds |
@@ -86,6 +80,20 @@ prompt inside the shell may read `I have no name!`. That is harmless.
 
 \* At `-j 150` on the paper's 192-thread machine; expect about 150/N times longer at `-j N`. The 1 s and 10 s
 columns depend on the machine and its load.
+
+For comparison, the paper's numbers from its full run (% of queries solved within 60 s; the summary rows of
+`tables/solvers.txt` and `tables/modularity_ablation.txt`):
+
+| | Verus | Verus held-out | Dafny | F\* |
+|---|---:|---:|---:|---:|
+| Sundance (proofs) | 83.0 | 90.2 | 73.7 | 56.7 |
+| Z3, tool options | 99.8 | 99.8 | 98.0 | 97.8 |
+| Z3, tool options (proofs) | 91.8 | 97.7 | 66.5 | 97.7 |
+| cvc5 (proofs) | 88.4 | 95.3 | 69.8 | 54.9 |
+| Alt-Ergo | 79.8 | 82.8 | 70.4 | 59.3 |
+| Sundance, Semper e-graph | 75.7 | 81.7 | 56.9 | 54.7 |
+| Sundance, MiniSat | 79.2 | 86.1 | 70.4 | 49.5 |
+| Sundance, Z3 arithmetic | 81.9 | 88.3 | 70.5 | 50.5 |
 
 A small local run, start to finish (20 random queries per set, all solvers and Sundance configs; output in
 `results/sample20_t60/`):
@@ -141,7 +149,7 @@ added. 60 s per query.
 | `/opt/solvers/{z3-5.3.0,cvc5-1.4.2,alt-ergo-2.4.3-free}` | Z3 5.3.0, cvc5 1.4.2 (static), and Alt-Ergo 2.4.3 (alt-ergo-free, built with opam on OCaml 5.2.1), with their licenses |
 | `/opt/sundance/bin/sundance-smt-semper` | Sundance with the Semper e-graph: branch `semper-egraph-minimal` (`5c15293`, main `c175059` plus the Semper adapter), features `local-z3,minisat,semper-egraph`, rustc 1.98.1. Dependencies pinned by `docker/Cargo.lock.5c15293cd940` |
 | `/opt/z3-4.13.4` | libz3 4.13.4, linked into Sundance for `--arithmetic z3incremental` |
-| `/artifact/scripts`, `/artifact/manifests`, `/artifact/paper_results` | the scripts, the paper's file lists, and the paper's per-query results |
+| `/artifact/scripts`, `/artifact/manifests` | the scripts, and the paper's file lists |
 
 To build other Sundance commits, run `docker buildx build --load --build-arg SUNDANCE_COMMIT=<commit> --build-arg SUNDANCE_SEMPER_COMMIT=<commit> -t sundance-artifact .`. Without a matching `docker/Cargo.lock.<commit>`, its dependencies are resolved at build time.
 

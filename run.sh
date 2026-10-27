@@ -8,7 +8,7 @@ set -euo pipefail
 if [ -f /artifact/README.md ] && ! command -v docker > /dev/null; then
   cat >&2 <<'MSG'
 run.sh starts the artifact's container, and you are already inside it.
-- Here, run commands directly, e.g.:  smoke_test.sh 5 10 4    make_paper_tables.sh    count_supported.py
+- Here, run commands directly, e.g.:  smoke_test.sh 5 10 4    make_tables.sh /results/smoke_n5_t10    count_supported.py
 - To download benchmarks, type `exit` and run on your machine:  ./run.sh fetch_benchmarks.sh ... /benchmarks
   (in this shell /benchmarks is read-only)
 MSG

@@ -40,23 +40,8 @@ ABLATION_HEADER = [
     "  MiniSat                 Default with --sat-backend minisat (no proofs: the MiniSat backend has no proof tracer)",
     "  Z3 arithmetic (proofs)  Default with --arithmetic z3incremental (Z3's incremental arithmetic)",
 ]
-# Names of the same configs in the paper's own run (final_experiments/2026-10-15_03-14-03), so these scripts also
-# read that run's results directory.
-PAPER_RUN_NAMES = {"sundance-default-proof": "sundance-internalincremental238fix-proof",
-                   "sundance-sat-minisat": "sundance-internalincremental238fix-minisat",
-                   "sundance-arith-z3-proof": "sundance-proof",
-                   "sundance-egraph-semper-proof": "sundance-internalincremental238fix-semper-proof"}
-
-
 def results_csv(root, bench, cfg):
-    path = root / "results" / bench / f"{cfg}_results.csv"
-    if not path.exists() and cfg in PAPER_RUN_NAMES:
-        old = root / "results" / bench / f"{PAPER_RUN_NAMES[cfg]}_results.csv"
-        if old.exists():
-            import sys
-            print(f"note: {bench}/{cfg}: reading the paper run's {old.name}", file=sys.stderr)
-            return old
-    return path
+    return root / "results" / bench / f"{cfg}_results.csv"
 
 
 def subproject(bench, f):

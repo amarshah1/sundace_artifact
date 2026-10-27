@@ -50,19 +50,8 @@ CVC5_PROOF = {"cvc5-proof": "cvc5 (proofs)",
               "cvc5-nocbqi-strict-proof": "cvc5 (proofs)"}
 
 
-# Names of the same configs in the paper's own run (final_experiments/2026-10-15_03-14-03), so these scripts also
-# read that run's results directory.
-PAPER_RUN_NAMES = {"sundance-default-proof": "sundance-internalincremental238fix-proof",
-                   "sundance-sat-minisat": "sundance-internalincremental238fix-minisat",
-                   "sundance-arith-z3-proof": "sundance-proof",
-                   "sundance-egraph-semper-proof": "sundance-internalincremental238fix-semper-proof"}
-
-
 def results_csv(root, bench, cfg):
-    path = root / "results" / bench / f"{cfg}_results.csv"
-    if not path.exists() and cfg in PAPER_RUN_NAMES:
-        path = root / "results" / bench / f"{PAPER_RUN_NAMES[cfg]}_results.csv"
-    return path
+    return root / "results" / bench / f"{cfg}_results.csv"
 
 
 def load(root, bench, prefix, keep, dedupe):

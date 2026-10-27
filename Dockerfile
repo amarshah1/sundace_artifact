@@ -129,7 +129,6 @@ COPY --from=sundance /opt/sundance /opt/sundance
 COPY --from=tools /opt/tokei/bin/tokei /usr/local/bin/tokei
 COPY scripts/ /artifact/scripts/
 COPY manifests/ /artifact/manifests/
-COPY paper_results/ /artifact/paper_results/
 COPY README.md run.sh /artifact/
 ENV LD_LIBRARY_PATH=/opt/z3-4.13.4/lib \
     PATH=/artifact/scripts:/opt/sundance/bin:/opt/solvers/z3-5.3.0:/opt/solvers/cvc5-1.4.2:/opt/solvers/alt-ergo-2.4.3-free:$PATH \
