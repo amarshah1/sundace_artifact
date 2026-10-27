@@ -19,6 +19,9 @@ rebuild its tables and figures.
 git clone https://github.com/amarshah1/sundace_artifact.git
 cd sundace_artifact
 docker buildx build --load -t sundance-artifact .
+# If you built the image under another name (VS Code's Docker extension, for example, suggests
+# sundanceartifactexperiment), rename it so that run.sh finds it:
+#   docker tag sundanceartifactexperiment sundance-artifact
 ./run.sh fetch_benchmarks.sh --only verus --only heldout --only dafny_fstar --asset UFLIA-fs_vwasm.tar.xz /benchmarks
 ./run.sh smoke_test.sh 5 10 4          # 5 queries per set, 10 s timeout, 4 parallel jobs
 ./run.sh make_paper_tables.sh          # the paper's tables and figures from the paper's raw results

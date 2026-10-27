@@ -18,6 +18,11 @@ here=$(cd "$(dirname "$0")" && pwd)
 image=${SUNDANCE_IMAGE:-sundance-artifact}
 bench=${BENCH_DIR:-$here/benchmarks}
 results=${RESULTS_DIR:-$here/results}
+if ! docker image inspect "$image" > /dev/null 2>&1; then
+  echo "run.sh: no Docker image named '$image'. Build it (docker buildx build --load -t sundance-artifact .)," >&2
+  echo "or, if you built it under another name, rename it: docker tag <that name> $image" >&2
+  exit 1
+fi
 mkdir -p "$bench" "$results"
 mode=ro
 [ "${1:-}" = fetch_benchmarks.sh ] && mode=rw
