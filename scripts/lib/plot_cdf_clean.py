@@ -69,6 +69,10 @@ def results_csv(root, bench, cfg):
 
 def load(root, bench, prefix, keep, dedupe):
     out = {}
+    def wanted(f):
+        return (not prefix or f.startswith(prefix)) and not (dedupe and bench == "verus" and f.startswith("anvil/splinterdb-smt-"))
+    # Denominator: the queries in the manifest (a config whose CSV lacks some of them counts those as unsolved)
+    n_manifest = sum(1 for f in keep if wanted(f)) if keep is not None else None
     for cfg in ["sundance-proof", "sundance-semper-proof", "sundance-semper-unpatched-proof", "sundance-minisat",
                 "sundance-internal-proof"] + ([SUNDANCE_CFG] if SUNDANCE_CFG else []) + list(II238) + [
                 "z3-tool", "z3-tool-proof", "alt-ergo"] + list(CVC5_PROOF):
@@ -86,7 +90,7 @@ def load(root, bench, prefix, keep, dedupe):
                 continue
             rows.append(r)
         out[cfg] = (sorted(t for t in (float(r["time_seconds"]) for r in rows if r["result"] == "unsat")
-                           if t <= MAX_TIME), len(rows))
+                           if t <= MAX_TIME), n_manifest if n_manifest is not None else len(rows))
     return out
 
 
@@ -155,9 +159,9 @@ def plot(key, title, data, out_dir):
 
     ax.set_xscale("log")
     ax.set_xlim(0.01, MAX_TIME)
-    ticks = [0.01, 0.1, 1, 10, 60]
+    ticks = [t for t in (0.01, 0.1, 1, 10) if t < MAX_TIME] + [MAX_TIME]
     ax.set_xticks(ticks)
-    ax.set_xticklabels(["0.01", "0.1", "1", "10", "60"])
+    ax.set_xticklabels([f"{t:g}" for t in ticks])
     ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
     ax.set_ylim(0, 100)
     ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(decimals=0))
@@ -200,11 +204,16 @@ def main():
     ap.add_argument("--keep-duplicates", action="store_true")
     ap.add_argument("--combined", action="store_true", help="Verus + held-out and Dafny + F* figures instead of the 4 sets")
     a = ap.parse_args()
-    global SUNDANCE_ONLY, SUNDANCE_CFG, SUNDANCE_238FIX
+    global SUNDANCE_ONLY, SUNDANCE_CFG, SUNDANCE_238FIX, MAX_TIME
     SUNDANCE_238FIX = a.sundance_238fix
     SUNDANCE_ONLY = a.sundance_only or a.sundance_238fix
     SUNDANCE_CFG = a.sundance
     root = Path(a.root)
+    try:  # the time axis follows the run's timeout (60 s in the paper)
+        import json
+        MAX_TIME = float(json.loads((root / "run_settings.json").read_text())["timeout"])
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
     if a.manifests is None:
         a.manifests = str(root / "manifests")
     out_dir = Path(a.out) if a.out else root / "plots" / (f"clean_{a.sundance}" if a.sundance else

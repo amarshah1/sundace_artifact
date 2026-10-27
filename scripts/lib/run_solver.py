@@ -356,6 +356,13 @@ def categorize_result(stdout: str, stderr: str) -> str:
 
 # --------------------------------------------------------------------------- one job
 def process_one(args):
+    try:
+        return _process_one(args)
+    except Exception as e:  # e.g. disk full while writing a proof: record it, keep the other jobs running
+        return args[0], 'error', 0.0, "", "", {'detail': f"runner exception: {type(e).__name__}: {e}"[:200]}
+
+
+def _process_one(args):
     filepath, base, solver, timeout, proofs_dir, solver_kind, opts = args
     if solver_kind == "altergo":
         return process_altergo(filepath, solver, timeout, opts)
@@ -391,6 +398,8 @@ def process_one(args):
             category = 'timeout'
     if returncode is not None:
         stats['exit_code'] = returncode
+        if returncode < 0 and category != 'unsat':
+            stats['detail'] = f"killed by signal {-returncode} (out of memory?)"
     pre_verdict, post_verdict = split_at_verdict(stdout)
     if solver_kind == "z3":
         # z3 5.3.0 reports an (error ...) for Verus's (declare-fun partial-order ...) and continues
@@ -410,6 +419,21 @@ def process_one(args):
     return filepath, category, time_taken, stdout, stderr, stats
 
 
+def available_cpus() -> int:
+    """CPUs this process may use: the affinity mask, further capped by a cgroup v2 CPU quota (docker --cpus)."""
+    try:
+        n = len(os.sched_getaffinity(0))
+    except AttributeError:
+        n = os.cpu_count() or 1
+    try:
+        quota, period = Path("/sys/fs/cgroup/cpu.max").read_text().split()
+        if quota != "max":
+            n = min(n, max(1, int(int(quota) / int(period))))
+    except (OSError, ValueError):
+        pass
+    return max(1, n)
+
+
 def list_files(folder: Path) -> List[Path]:
     out = []
     for root, _, files in os.walk(str(folder)):
@@ -425,7 +449,7 @@ def main():
     ap.add_argument("folder")
     ap.add_argument("-o", "--output-dir", required=True)
     ap.add_argument("--run-name", required=True)
-    ap.add_argument("-j", "--jobs", type=int, default=os.cpu_count())
+    ap.add_argument("-j", "--jobs", type=int, default=available_cpus())
     ap.add_argument("--timeout", type=int, default=60)
     ap.add_argument("--grace", type=int, default=30, help="seconds past --timeout before the hard kill")
     ap.add_argument("--solver", required=True, help="solver command (binary + fixed flags)")
@@ -482,27 +506,72 @@ def main():
         log(f"Option {k}: {v}")
     log("-" * 60)
     t0 = time.time()
+    # Progress file: one JSON line per finished query, so an interrupted run resumes where it stopped.
+    # Its first line records the settings; a progress file from other settings is discarded.
+    settings = {"solver": solver, "kind": a.kind, "timeout": a.timeout, "grace": a.grace,
+                "files": len(files), "proofs": bool(proofs)}
+    progress = out_dir / f"{a.run_name}_results.progress.jsonl"
+    done: Dict[str, Tuple[str, float, Dict[str, Any]]] = {}
+    if progress.exists():
+        lines = progress.read_text().splitlines()
+        try:
+            if lines and json.loads(lines[0]) == settings:
+                for line in lines[1:]:
+                    try:
+                        r = json.loads(line)
+                    except ValueError:
+                        continue  # torn last line
+                    done[r["file"]] = (r["result"], r["time"], r["stats"])
+                log(f"Resuming: {len(done)} of {len(files)} queries already done")
+            else:
+                log("Discarding a progress file from a run with other settings")
+        except ValueError:
+            pass
+    if not done:
+        progress.write_text(json.dumps(settings) + "\n")
     rows, counts = [], {}
-    jobs = [(f, folder, solver, a.timeout, proofs, a.kind, opts) for f in files]
-    with mp.Pool(processes=max(1, a.jobs)) as pool:
-        for i, (f, cat, t, _, _, stats) in enumerate(pool.imap_unordered(process_one, jobs), 1):
+    for f in files:
+        rel = str(f.relative_to(folder))
+        if rel in done:
+            cat, t, stats = done[rel]
             rows.append((f, cat, t, stats))
             counts[cat] = counts.get(cat, 0) + 1
+    jobs = [(f, folder, solver, a.timeout, proofs, a.kind, opts) for f in files
+            if str(f.relative_to(folder)) not in done]
+    killed = 0
+    with open(progress, "a") as pf, mp.Pool(processes=max(1, a.jobs)) as pool:
+        for i, (f, cat, t, _, _, stats) in enumerate(pool.imap_unordered(process_one, jobs), len(rows) + 1):
+            rows.append((f, cat, t, stats))
+            counts[cat] = counts.get(cat, 0) + 1
+            killed += "killed by signal" in str(stats.get('detail', ''))
+            pf.write(json.dumps({"file": str(f.relative_to(folder)), "result": cat, "time": t,
+                                 "stats": stats}) + "\n")
+            pf.flush()
             extra = (" " + " ".join(f"{k}={v}" for k, v in stats.items()
                                     if not str(k).startswith("per_round"))) if stats else ""
             log(f"[{i}/{len(files)}] {f.relative_to(folder)} -> {cat.upper()} [{t:.2f}s]{extra[:400]}")
     log(f"\nProcessing completed in {time.time() - t0:.2f} seconds")
     log("SUMMARY " + " ".join(f"{k}={v}" for k, v in sorted(counts.items())) + f" total={len(files)}")
+    if killed:
+        log(f"WARNING: {killed} solver runs were killed by a signal before the timeout (out of memory?); "
+            "they count as unsolved. Use fewer parallel jobs (-j) or a machine with more memory.")
     keys: List[str] = []
     for _, _, _, s in rows:
         for k in s:
             if k not in keys:
                 keys.append(k)
-    with open(out_dir / f"{a.run_name}_results.csv", "w", newline="") as fh:
+    csv_path = out_dir / f"{a.run_name}_results.csv"
+    tmp = csv_path.with_suffix(".csv.tmp")
+    with open(tmp, "w", newline="") as fh:
         w = csv.writer(fh)
         w.writerow(['file', 'result', 'time_seconds'] + keys)
         for f, cat, t, s in sorted(rows, key=lambda r: str(r[0])):
             w.writerow([str(f.relative_to(folder)), cat, f"{t:.2f}"] + [s.get(k, "") for k in keys])
+    os.replace(tmp, csv_path)
+    # Written last: the driver treats a run as finished only if this file matches the CSV.
+    (out_dir / f"{a.run_name}_results.json").write_text(json.dumps(
+        dict(settings, rows=len(rows), counts=counts, killed_by_signal=killed, finished=time.time())) + "\n")
+    remove_if_exists(progress)
 
 
 if __name__ == "__main__":

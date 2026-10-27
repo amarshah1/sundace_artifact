@@ -9,8 +9,9 @@ queries" (intro and Sec. 8) from the folder counts of the downloaded benchmark s
   Dafny / F*:     dafny_fstar_benchmarks/{UFLIA,nonlinear,bitvector,strings}/<project>/*.smt2
                   (Dafny = d_* projects, F* = fs_* projects)
 
---lists DIR counts the release's .list files instead (UFLIA-<project>.list, nonlinear.list, bitvector.list,
-strings.list), so the Dafny/F* numbers can be checked without extracting the 79 GB.
+Dafny/F*: if the full set is not extracted (it is ~79 GB), the counts come from the release's file lists in
+/artifact/manifests/dafny_fstar_release (the member lists of the eight v1.0 tarballs); --lists DIR picks another
+directory of such lists.
 
 Scope (as in the paper's numbers): the held-out totals leave out the vest and rlsf projects, which were set aside
 before the set was built, and Mariposa's Serval project (s_komodo_clean) is not part of the Dafny/F* sets.
@@ -43,15 +44,18 @@ def count_tree(root: Path, folder_for_cat, group_of):
     return c
 
 
+LISTS = Path(__file__).resolve().parent.parent / "manifests" / "dafny_fstar_release"
+FOLDER_CAT = {"UFLIA": "supported", "nonlinear": "nonlinear", "bitvector": "bitvector", "strings": "strings"}
+
+
 def count_lists(lists: Path):
+    """Counter from tarball member lists: lines like UFLIA/d_fvbkv/x.smt2 or bitvector/d_komodo/y.smt2."""
     c = Counter()
-    for lf in sorted(lists.glob("*.list")):
-        stem = lf.stem
-        cat = "supported" if stem.startswith("UFLIA-") else stem
+    for lf in sorted(lists.glob("*.txt")):
         for line in lf.read_text().split():
-            parts = Path(line).parts  # e.g. no_bv/d_fvbkv/x.smt2, bv_unknown/d_komodo/y.smt2
-            project = parts[1] if len(parts) > 2 else ""
-            c[(dafny_fstar(project), cat)] += 1
+            parts = Path(line).parts
+            if len(parts) >= 3 and parts[0] in FOLDER_CAT:
+                c[(dafny_fstar(parts[1]), FOLDER_CAT[parts[0]])] += 1
     return c
 
 
@@ -83,12 +87,17 @@ def main():
                      "strings": ["strings"]}, lambda p: "heldout")
     if ho:
         ok &= row("Verus held-out", ho, "heldout")
-    if a.lists:
-        df = count_lists(Path(a.lists))
-    else:
+    df = None
+    if not a.lists:
         df = count_tree(root / "dafny_fstar_benchmarks",
                         {"supported": ["UFLIA"], "nonlinear": ["nonlinear"], "bitvector": ["bitvector"],
                          "strings": ["strings"]}, dafny_fstar)
+        if sum(df.values()) != 15849:   # all eight tarballs extracted: 14,869 + 492 + 466 + 22
+            print(f"(Dafny/F*: only {sum(df.values()):,} of the 15,849 files are extracted under {root}; "
+                  f"counting the release's file lists in {LISTS} instead)")
+            df = None
+    if df is None:
+        df = count_lists(Path(a.lists) if a.lists else LISTS)
     if df:
         ok &= row("Dafny", df, "Dafny")
         ok &= row("F*", df, "F*")

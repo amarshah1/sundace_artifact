@@ -34,7 +34,7 @@ ABLATION = [("sundance-default-proof", "Default (proofs)"),
             ("sundance-arith-z3-proof", "Z3 arithmetic (proofs)")]
 ABLATION_HEADER = [
     "Sundance modularity ablation: queries solved (unsat within 1 s / 10 s / 60 s of wall time)",
-    "Same Sundance build, one component swapped by a flag; eDRAT proofs; --infer-triggers on Dafny/F*.",
+    "Each variant swaps one component of Default; eDRAT proofs; --infer-triggers on Dafny/F*.",
     "  Default (proofs)        --arithmetic internalincremental, CaDiCaL, Sundance e-graph",
     "  Semper (proofs)         Semper e-graph (not on Sundance main yet; shown only if its results exist)",
     "  MiniSat                 Default with --sat-backend minisat (no proofs: the MiniSat backend has no proof tracer)",
@@ -51,7 +51,11 @@ PAPER_RUN_NAMES = {"sundance-default-proof": "sundance-internalincremental238fix
 def results_csv(root, bench, cfg):
     path = root / "results" / bench / f"{cfg}_results.csv"
     if not path.exists() and cfg in PAPER_RUN_NAMES:
-        path = root / "results" / bench / f"{PAPER_RUN_NAMES[cfg]}_results.csv"
+        old = root / "results" / bench / f"{PAPER_RUN_NAMES[cfg]}_results.csv"
+        if old.exists():
+            import sys
+            print(f"note: {bench}/{cfg}: reading the paper run's {old.name}", file=sys.stderr)
+            return old
     return path
 
 
@@ -68,7 +72,12 @@ def load(root, bench, cfg):
 
 
 def cell(n, total):
-    return f"{n:,}/{total:,} ({100.0 * n / total:.1f}%)"
+    return "n/a" if n is None else f"{n:,}/{total:,} ({100.0 * n / total:.1f}%)"
+
+
+def short_path(p):
+    p, home = str(Path(p).resolve()), str(Path.home().resolve())
+    return "~" + p[len(home):] if home not in ("/", "") and p.startswith(home + "/") else p
 
 
 def table(title, cols, rows, width=22):
@@ -86,6 +95,13 @@ def main():
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     root = Path(a.root)
+    global THRESHOLDS
+    try:  # thresholds follow the run's timeout (1 / 10 / 60 s for the paper's 60 s runs)
+        timeout = int(__import__("json").loads((root / "run_settings.json").read_text())["timeout"])
+    except (OSError, ValueError, KeyError, TypeError):
+        timeout = 60
+    THRESHOLDS = [float(t) for t in (1, 10, 60) if t < timeout] + [float(timeout)]
+    tlabel = " / ".join(f"{int(t)} s" for t in THRESHOLDS)
     cfgs = ABLATION if a.modularity_ablation else configs(a.sundance)
     manifests = {b: set((root / "manifests" / f"{b}.txt").read_text().split())
                  for b in ("verus", "verus_heldout", "mariposa") if (root / "manifests" / f"{b}.txt").exists()}
@@ -93,18 +109,25 @@ def main():
         raise SystemExit(f"no manifests in {root / 'manifests'}: run the evaluations first")
     global SETS
     SETS = [x for x in SETS if x[1] in manifests]
-    missing = [c for c, _ in cfgs if not all(results_csv(root, b, c).exists() for b in manifests)]
-    if missing:
-        import sys
-        print(f"note: no results on every set for {', '.join(missing)}; left out of the table", file=sys.stderr)
-    cfgs = [x for x in cfgs if x[0] not in missing]
-    res = {(b, c): load(root, b, c) for b in manifests for c, _ in cfgs}
+    res = {(b, c): load(root, b, c) for b in manifests for c, _ in cfgs if results_csv(root, b, c).exists()}
+    absent = [c for c, _ in cfgs if not any((b, c) in res for b in manifests)]
+    partial = [f"{b}/{c}" for c, _ in cfgs for b in manifests if c not in absent and (b, c) not in res]
+    import sys
+    if absent:
+        print(f"note: no results for {', '.join(absent)}; left out of the table", file=sys.stderr)
+    if partial:
+        print(f"note: no results for {', '.join(partial)}; shown as n/a", file=sys.stderr)
+    cfgs = [x for x in cfgs if x[0] not in absent]
+    if not cfgs:
+        raise SystemExit(f"no results under {root / 'results'}")
 
     def files(bench, prefix, dedupe=True):
         return sorted(f for f in manifests[bench] if (not prefix or f.startswith(prefix))
                       and not (dedupe and bench == "verus" and f.startswith("anvil/splinterdb-smt-")))
 
     def solved(bench, cfg, fs, t):
+        if (bench, cfg) not in res:
+            return None
         r = res[(bench, cfg)]
         return sum(1 for f in fs if f in r and r[f][0] == "unsat" and r[f][1] <= t)
 
@@ -118,35 +141,40 @@ def main():
     L = []
     if a.modularity_ablation:
         L += ABLATION_HEADER + [
-            f"Run folder: {str(root.resolve()).replace(str(Path.home().resolve()), '~').replace('/local~', '~')}/",
-            "60 s timeout; an unsat after the threshold counts as unsolved.",
+            f"Run folder: {short_path(root)}/",
+            f"{timeout} s timeout; an unsat after the threshold counts as unsolved.",
             "Benchmarks: current lists (nonlinear queries excluded); the 1,187 duplicate anvil/splinterdb-smt-* Verus queries removed.",
             ""]
     else:
-        L += ["Queries solved (unsat within 1 s / 10 s / 60 s of wall time)",
-            f"Run folder: {str(root.resolve()).replace(str(Path.home().resolve()), '~').replace('/local~', '~')}/",
+        L += [f"Queries solved (unsat within {tlabel} of wall time)",
+            f"Run folder: {short_path(root)}/",
             "Sundance: --arithmetic internalincremental, CaDiCaL, eDRAT proofs, --infer-triggers on Dafny/F*.",
-            "Z3 5.3.0, cvc5 1.4.2, Alt-Ergo 2.4.3 (free). 60 s timeout, unsat after the threshold counts as unsolved.",
+            f"Z3 5.3.0, cvc5 1.4.2, Alt-Ergo 2.4.3 (free). {timeout} s timeout, unsat after the threshold counts as unsolved.",
             "Benchmarks: current lists (nonlinear queries excluded); the 1,187 duplicate anvil/splinterdb-smt-* Verus queries removed.",
             ""]
     # Compact percentage summary
     cols = [f"{n} {int(t)}s" for n, _, _ in set_files for t in THRESHOLDS]
-    hdr = "config".ljust(45) + "".join(f"{n:>27}" for n, _, _ in set_files)
-    sub = " " * 45 + "".join(f"{'1 s':>9}{'10 s':>9}{'60 s':>9}" for _ in set_files)
-    L += ["Summary (% solved)", hdr, sub, "-" * (45 + 27 * len(set_files))]
+    w = 9 * len(THRESHOLDS)
+    hdr = "config".ljust(45) + "".join(f"{n:>{w}}" for n, _, _ in set_files)
+    sub = " " * 45 + "".join("".join(f"{'%d s' % t:>9}" for t in THRESHOLDS) for _ in set_files)
+    L += ["Summary (% solved)", hdr, sub, "-" * (45 + w * len(set_files))]
+    pct = lambda n, fs: "      n/a" if n is None else f"{100.0 * n / len(fs):8.1f}%"
     for c, label in cfgs:
         row = label.ljust(45)
         for _, bench, fs in set_files:
-            row += "".join(f"{100.0 * solved(bench, c, fs, t) / len(fs):8.1f}%" for t in THRESHOLDS)
+            row += "".join(pct(solved(bench, c, fs, t), fs) for t in THRESHOLDS)
         L.append(row)
     L.append("")
     # Combined per verifier (Verus = original + held-out, Mariposa = Dafny + F*), as in plot_cdf_clean.py --combined
     combined = [(n, [(b, files(b, None)) for b in bs if b in manifests])
                 for n, bs in (("Verus + held-out", ("verus", "verus_heldout")), ("Dafny + F*", ("mariposa",)))]
     combined = [(n, parts) for n, parts in combined if parts]
-    L += table("Combined per verifier (unsat within 1 s / 10 s / 60 s)",
+    def total(c, parts, t):
+        xs = [solved(b, c, fs, t) for b, fs in parts]
+        return None if None in xs else sum(xs)
+    L += table(f"Combined per verifier (unsat within {tlabel})",
                [f"{n} {int(t)} s" for n, _ in combined for t in THRESHOLDS],
-               [(label, [cell(sum(solved(b, c, fs, t) for b, fs in parts), sum(len(fs) for _, fs in parts))
+               [(label, [cell(total(c, parts, t), sum(len(fs) for _, fs in parts))
                          for _, parts in combined for t in THRESHOLDS]) for c, label in cfgs], width=24)
     for t in reversed(THRESHOLDS):
         L += [f"===== Within {int(t)} s =====", ""]

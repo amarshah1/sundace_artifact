@@ -59,6 +59,7 @@ RUN set -eu; arch=${TARGETARCH:-$(dpkg --print-architecture)}; \
     unzip -q libz3.zip; \
     mkdir -p /opt/z3-4.13.4/lib && cp -r "$libz3/include" /opt/z3-4.13.4/; \
     cp "$libz3/bin/libz3.so" /opt/z3-4.13.4/lib/ && cp "$libz3/LICENSE.txt" /opt/z3-4.13.4/; \
+    cp "$libz3/LICENSE.txt" /opt/solvers/z3-5.3.0/LICENSE.txt; \
     /opt/solvers/z3-5.3.0/z3 --version && /opt/solvers/cvc5-1.4.2/cvc5 --version | head -1
 
 ###############################################################################
@@ -66,9 +67,9 @@ RUN set -eu; arch=${TARGETARCH:-$(dpkg --print-architecture)}; \
 ###############################################################################
 FROM ${UBUNTU} AS altergo
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates curl git opam build-essential m4 pkg-config autoconf libgmp-dev zlib1g-dev unzip bubblewrap \
+        ca-certificates curl git opam build-essential m4 pkg-config autoconf libgmp-dev zlib1g-dev unzip \
     && rm -rf /var/lib/apt/lists/*
-ENV OPAMYES=1 OPAMROOTISOK=1 OPAMJOBS=16
+ENV OPAMYES=1 OPAMROOTISOK=1
 # opam-repository pinned to the commit current when the run's switch was created (2026-10-14 ~15:54 UTC)
 RUN opam init --bare --disable-sandboxing -n default \
         "git+https://github.com/ocaml/opam-repository.git#820008e4fe2dba60074e90839ffd21f9da0f7ff3" \
@@ -79,7 +80,10 @@ RUN opam install --switch=ae-free-ocaml5 alt-ergo-free.2.4.3 camlzip.1.14 cmdlin
         stdlib-shims.0.3.0 zarith.1.14 csexp.1.5.2 \
  && install -D -m 755 "$(opam var --switch=ae-free-ocaml5 bin)/alt-ergo" /opt/solvers/alt-ergo-2.4.3-free/alt-ergo \
  && /opt/solvers/alt-ergo-2.4.3-free/alt-ergo --version \
- && opam list --switch=ae-free-ocaml5 --installed --columns=name,version > /opt/solvers/alt-ergo-2.4.3-free/opam-packages.txt
+ && opam list --switch=ae-free-ocaml5 --installed --columns=name,version > /opt/solvers/alt-ergo-2.4.3-free/opam-packages.txt \
+ && (cp "$(opam var --switch=ae-free-ocaml5 doc)"/alt-ergo-free/LICENSE* /opt/solvers/alt-ergo-2.4.3-free/ 2>/dev/null \
+     || find "$(opam var --switch=ae-free-ocaml5 prefix)" -path '*alt-ergo*' -iname 'LICENSE*' -exec cp {} /opt/solvers/alt-ergo-2.4.3-free/ \; ) \
+ && ls /opt/solvers/alt-ergo-2.4.3-free/
 
 ###############################################################################
 # Sundance: built from source (github.com/yaspar-org/Sundance-SMT). Its configurations are runtime flags.
@@ -95,8 +99,7 @@ ARG SUNDANCE_REPO=https://github.com/yaspar-org/Sundance-SMT.git
 # Latest main at the time of writing (2026-10-26, #247). Override with --build-arg SUNDANCE_COMMIT=<commit>.
 ARG SUNDANCE_COMMIT=c17505996a5405135d989334f45738903960bccf
 COPY --chmod=755 docker/build_sundance.sh /usr/local/bin/build_sundance.sh
-ARG CARGO_BUILD_JOBS=32
-ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
+COPY docker/ /ctx/docker/
 # Features: local-z3 (links libz3 4.13.4, for --arithmetic z3incremental) and minisat (for --sat-backend minisat)
 RUN build_sundance.sh "$SUNDANCE_REPO" "$SUNDANCE_COMMIT" local-z3,minisat
 
@@ -120,9 +123,10 @@ COPY --from=sundance /opt/sundance /opt/sundance
 COPY --from=tools /opt/tokei/bin/tokei /usr/local/bin/tokei
 COPY scripts/ /artifact/scripts/
 COPY manifests/ /artifact/manifests/
-COPY README.md /artifact/README.md
+COPY paper_results/ /artifact/paper_results/
+COPY README.md run.sh /artifact/
 ENV LD_LIBRARY_PATH=/opt/z3-4.13.4/lib \
-    PATH=/artifact/scripts:/opt/sundance/bin:$PATH \
+    PATH=/artifact/scripts:/opt/sundance/bin:/opt/solvers/z3-5.3.0:/opt/solvers/cvc5-1.4.2:/opt/solvers/alt-ergo-2.4.3-free:$PATH \
     BENCH_ROOT=/benchmarks RESULTS_ROOT=/results
 WORKDIR /artifact
 CMD ["bash", "-lc", "cat /artifact/README.md"]
