@@ -80,12 +80,22 @@ prompt inside the shell may read `I have no name!`. That is harmless.
 |---|---|---|
 | Solver comparison (RQ1/RQ2) | `./run.sh run_all_solvers.sh --manifests /artifact/manifests/paper -j N` | ~4.5 h |
 | Sundance configurations (RQ3) | `./run.sh run_sundance_configs.sh --manifests /artifact/manifests/paper -j N` | ~4 h more |
-| Tables and figures | `./run.sh make_tables.sh` and `./run.sh make_plots.sh` → `results/paper/{tables,plots}/` | seconds |
+| Tables and figures from your run | `./run.sh make_tables.sh RUN` and `./run.sh make_plots.sh RUN` (RUN: the run's output folder, default `/results/paper`) → `results/<run>/{tables,plots}/` | seconds |
 | Supported fraction (91.3% / 93.0% / 97.1%) | `./run.sh count_supported.py` (counts the file lists of the benchmark repos, including the queries Sundance does not support, which are not downloaded) | seconds |
 | Lines of code (13,612 / 519,367 / 358,294) | `./run.sh count_lines.sh --paper` (needs network; clones into `results/loc_count/`) | ~1 min |
 
 \* At `-j 150` on the paper's 192-thread machine; expect about 150/N times longer at `-j N`. The 1 s and 10 s
 columns depend on the machine and its load.
+
+A small local run, start to finish (20 random queries per set, all solvers and Sundance configs; output in
+`results/sample20_t60/`):
+
+```sh
+./run.sh run_all_solvers.sh --sample 20 -j 4
+./run.sh run_sundance_configs.sh --sample 20 -j 4
+./run.sh make_tables.sh /results/sample20_t60
+./run.sh make_plots.sh /results/sample20_t60
+```
 
 Options of `run_all_solvers.sh` and `run_sundance_configs.sh` (see `--help`):
 
