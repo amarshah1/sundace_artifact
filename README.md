@@ -139,6 +139,13 @@ added. 60 s per query.
 | `cvc5-nocbqi-strict-proof` | `cvc5 [Dafny/F*: --incremental] --no-cbqi --user-pat=strict --produce-proofs --dump-proofs --proof-format-mode=cpc --proof-granularity=dsl-rewrite --stats FILE --tlimit-per=60000` |
 | `alt-ergo` | `alt-ergo --timelimit=60 PREP`. PREP is FILE rewritten by `prep_smtlib.py --legacy-ae` (untimed) so that Alt-Ergo 2.4.3 can parse it |
 
+Semper is built from a separate branch of the Sundance repository (`semper-egraph-minimal`) because the Semper
+e-graph integration is not yet in Sundance's main branch.
+
+**Proof checking is not evaluated.** The paper checks Sundance's proofs with the proof checker Valido, which is not
+open source yet; we are in the process of open-sourcing it. The proof configs still write their proofs, to
+`results/<run>/proofs/`.
+
 `sundance-smt --help` lists `z3incremental` as the default arithmetic, because this build links Z3. The configs always pass `--arithmetic` explicitly.
 
 ## Contents of the image
