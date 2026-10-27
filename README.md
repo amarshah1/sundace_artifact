@@ -140,7 +140,9 @@ added. 60 s per query.
 | `alt-ergo` | `alt-ergo --timelimit=60 PREP`. PREP is FILE rewritten by `prep_smtlib.py --legacy-ae` (untimed) so that Alt-Ergo 2.4.3 can parse it |
 
 Semper is built from a separate branch of the Sundance repository (`semper-egraph-minimal`) because the Semper
-e-graph integration is not yet in Sundance's main branch.
+e-graph integration is not yet in Sundance's main branch. Supporting Semper is a minor, performance-oriented
+modification: the branch is main plus the Semper adapter (a new module behind Sundance's e-graph interface, compiled
+only with the `semper-egraph` feature) and about 80 lines of small changes elsewhere.
 
 **Proof checking is not evaluated.** The paper checks Sundance's proofs with the proof checker Valido, which is not
 open source yet; we are in the process of open-sourcing it. The proof configs still write their proofs, to
