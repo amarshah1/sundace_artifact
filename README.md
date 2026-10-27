@@ -9,7 +9,7 @@ rebuild its tables and figures.
 - **Docker.** On macOS and Windows, use Docker Desktop. On Linux, you need Docker Engine with the `buildx` plugin, and your user in the `docker` group.
 - **Disk:**
   - about 10 GB for the quick start
-  - about 90 GB of benchmarks plus 15 GB of results for the full evaluation
+  - about 80 GB of benchmarks plus 15 GB of results for the full evaluation
 - **Memory:** a few GB per parallel query. A few queries need up to 10 GB, so on a laptop use `-j` of 4 or less.
 - **Time:** building the image takes 10–20 minutes (Sundance and Alt-Ergo are compiled from source).
 
@@ -25,8 +25,8 @@ docker buildx build --load -t sundance-artifact .
 ```
 
 What you should see:
-- **Fetch:** the Verus and held-out Verus sets, plus the smallest Dafny/F\* tarball (F\* vWasm). Together they are about 8 GB.
-  - It ends with `Dafny/F*: partial download (1 of 8 tarballs)`. That is expected.
+- **Fetch:** the Verus and held-out Verus sets, plus the smallest Dafny/F\* tarball (F\* vWasm). Together they are about 7 GB.
+  - It ends with `Dafny/F*: partial download (1 of 5 tarballs)`. That is expected.
   - The git clones show no progress for a minute or two.
 - **Smoke test:** a few minutes, then one line per (benchmark set, config), for example `verus/z3-tool: unsat=5 total=5`.
   - `mariposa` is the Dafny/F\* set.
@@ -61,7 +61,7 @@ The prompt inside the shell may read `I have no name!`. That is harmless.
 
 ## Benchmarks
 
-`./run.sh fetch_benchmarks.sh /benchmarks` downloads all three sets: about 4 GB to download, about 85 GB on disk. Each set is checked, by git commit for the Verus sets and by sha256 for the tarballs. Rerunning skips what is already there.
+`./run.sh fetch_benchmarks.sh /benchmarks` downloads all three sets: about 3 GB to download, about 77 GB on disk. Only the queries the evaluation runs are downloaded (the `UFDTLIA/` and `UFLIA/` folders). Each set is checked, by git commit for the Verus sets and by sha256 for the tarballs. Rerunning skips what is already there.
 
 | set (`--only`) | source | queries |
 |---|---|---|
@@ -76,7 +76,7 @@ The prompt inside the shell may read `I have no name!`. That is harmless.
 | Solver comparison (RQ1/RQ2) | `./run.sh run_all_solvers.sh --manifests /artifact/manifests/paper -j N` | ~4.5 h |
 | Sundance configurations (RQ3) | `./run.sh run_sundance_configs.sh --manifests /artifact/manifests/paper -j N` | ~3 h more |
 | Tables and figures | `./run.sh make_tables.sh` and `./run.sh make_plots.sh` → `results/paper/{tables,plots}/` | seconds |
-| Supported fraction (91.3% / 93.0% / 97.1%) | `./run.sh count_supported.py --bench-root /benchmarks` | seconds |
+| Supported fraction (91.3% / 93.0% / 97.1%) | `./run.sh count_supported.py` (counts the file lists of the benchmark repos, including the queries Sundance does not support, which are not downloaded) | seconds |
 | Lines of code (13,612 / 519,367 / 358,294) | `./run.sh count_lines.sh --paper` (needs network; clones into `results/loc_count/`) | ~1 min |
 
 \* At `-j 150` on the paper's 192-thread machine; expect about 150/N times longer at `-j N`. The 1 s and 10 s

@@ -4,9 +4,7 @@ Clean per-set cactus plots (queries solved as unsat vs per-query wall time), one
 Verus, Verus held-out, Dafny, F*. Series: Sundance (proofs), z3 + tool options, z3 + tool options
 (proofs), and the better of the two cvc5 proof configs for that set.
 
-Queries are restricted to the current benchmark lists (--manifests, default: <root>/manifests; the
-third run's manifests are identical to the second run's, which exclude the nonlinear queries moved
-out on 2026-10-14), and the 1,187
+Queries are restricted to the run's file lists (--manifests, default: <root>/manifests), and the 1,187
 anvil/splinterdb-smt-* copies of splinterdb/* are dropped (--keep-duplicates to keep them).
 
 --sundance CFG plots the 5-line comparison (Sundance, Z3, Z3 proofs, cvc5 proofs, Alt-Ergo) with the

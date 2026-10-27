@@ -151,14 +151,14 @@ def main():
         L += ABLATION_HEADER + [
             f"Run folder: {short_path(root)}/",
             f"{timeout} s timeout; an unsat after the threshold counts as unsolved.",
-            "Benchmarks: current lists (nonlinear queries excluded); the 1,187 duplicate anvil/splinterdb-smt-* Verus queries removed.",
+            "Benchmarks: the paper's file lists; the 1,187 duplicate anvil/splinterdb-smt-* Verus queries removed.",
             ""]
     else:
         L += [f"Queries solved (unsat within {tlabel} of wall time)",
             f"Run folder: {short_path(root)}/",
             "Sundance: --arithmetic internalincremental, CaDiCaL, eDRAT proofs, --infer-triggers on Dafny/F*.",
             f"Z3 5.3.0, cvc5 1.4.2, Alt-Ergo 2.4.3 (free). {timeout} s timeout, unsat after the threshold counts as unsolved.",
-            "Benchmarks: current lists (nonlinear queries excluded); the 1,187 duplicate anvil/splinterdb-smt-* Verus queries removed.",
+            "Benchmarks: the paper's file lists; the 1,187 duplicate anvil/splinterdb-smt-* Verus queries removed.",
             ""]
     # Compact percentage summary
     cols = [f"{n} {int(t)}s" for n, _, _ in set_files for t in THRESHOLDS]
