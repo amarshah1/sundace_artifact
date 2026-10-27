@@ -19,7 +19,7 @@ rebuild its tables and figures.
 ## Quick start
 
 ```sh
-git clone https://github.com/amarshah1/sundace_artifact.git
+git clone https://github.com/amarshah1/sundace_artifact.git    # or unzip the artifact's Zenodo archive
 cd sundace_artifact
 docker buildx build --load -t sundance-artifact .
 # If you built the image under another name (VS Code's Docker extension, for example, suggests
