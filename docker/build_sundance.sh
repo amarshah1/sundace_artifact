@@ -4,15 +4,27 @@
 # Installs /opt/sundance/bin/NAME and records the build in /opt/sundance/info/NAME.txt.
 # Built with --no-default-features (the default bundled-z3 feature would compile Z3 from source); local-z3 links
 # the libz3 4.13.4 in /opt/z3-4.13.4, the version the paper's builds linked.
+# Source: sources/Sundance-SMT-<first 12 hex digits of the commit>.tar.gz in the artifact if present (a snapshot
+# of that commit), otherwise a clone of REPO.
 # Dependencies: Sundance does not commit a Cargo.lock, so this artifact ships one per commit
 # (docker/Cargo.lock.<first 12 hex digits of the commit>) and builds with --locked. For a commit without one,
 # cargo resolves the dependencies afresh (a warning is printed).
 set -euo pipefail
 repo=$1 commit=$2 features=$3 name=${4:-sundance-smt} toolchain=${5:-1.96.0}
-git clone -q --filter=blob:none "$repo" "/src/$name"
-cd "/src/$name"
-git -c advice.detachedHead=false checkout -q "$commit"
-full=$(git rev-parse HEAD)
+snapshot=/ctx/sources/Sundance-SMT-${commit:0:12}.tar.gz
+if [ ${#commit} -eq 40 ] && [ -f "$snapshot" ]; then
+  echo "building $name from the source snapshot $(basename "$snapshot")"
+  (cd /ctx/sources && grep " $(basename "$snapshot")\$" SHA256SUMS | sha256sum -c -)
+  mkdir -p "/src/$name" && tar -xzf "$snapshot" -C "/src/$name"
+  cd "/src/$name"
+  full=$commit source="snapshot $(basename "$snapshot")"
+else
+  echo "building $name from a clone of $repo"
+  git clone -q --filter=blob:none "$repo" "/src/$name"
+  cd "/src/$name"
+  git -c advice.detachedHead=false checkout -q "$commit"
+  full=$(git rev-parse HEAD) source="git clone of $repo"
+fi
 lock=/ctx/docker/Cargo.lock.${full:0:12}
 locked=()
 if [ -f "$lock" ]; then
@@ -30,8 +42,7 @@ cp LICENSE NOTICE /opt/sundance/ 2>/dev/null || cp LICENSE /opt/sundance/
 {
   echo "repo=$repo"
   echo "commit=$full"
-  echo "date=$(git log -1 --format=%cd --date=short)"
-  echo "subject=$(git log -1 --format=%s)"
+  echo "source=$source"
   echo "toolchain=$(rustc +"$toolchain" --version)"
   echo "features=$features"
   echo "cargo_lock=$([ ${#locked[@]} -gt 0 ] && echo "pinned ($(basename "$lock"))" || echo "resolved at build time")"

@@ -74,6 +74,12 @@ ENV OPAMYES=1 OPAMROOTISOK=1
 RUN opam init --bare --disable-sandboxing -n default \
         "git+https://github.com/ocaml/opam-repository.git#820008e4fe2dba60074e90839ffd21f9da0f7ff3" \
  && opam switch create ae-free-ocaml5 ocaml-base-compiler.5.2.1
+# Alt-Ergo's source comes from sources/ (opam finds it in its download cache and checks its sha256)
+COPY sources/alt-ergo-2.4.3-free.tar.gz /tmp/alt-ergo-2.4.3-free.tar.gz
+RUN h=92c54ff471fda58f93e84b3fc200bda4677cd39006c357b5be07d594d1825c6f \
+ && echo "$h  /tmp/alt-ergo-2.4.3-free.tar.gz" | sha256sum -c - \
+ && d="$(opam var root)/download-cache/sha256/$(echo "$h" | cut -c1-2)" && mkdir -p "$d" \
+ && mv /tmp/alt-ergo-2.4.3-free.tar.gz "$d/$h"
 # Package versions = the run's switch (~/.opam/ae-free-ocaml5/.opam-switch/switch-state)
 RUN opam install --switch=ae-free-ocaml5 alt-ergo-free.2.4.3 camlzip.1.14 cmdliner.1.3.0 dune.3.24.2 \
         menhir.20260209 num.1.6 ocamlfind.1.9.8 ocplib-simplex.0.4.1 psmt2-frontend.0.4.0 \
@@ -102,6 +108,7 @@ ARG SUNDANCE_REPO=https://github.com/yaspar-org/Sundance-SMT.git
 ARG SUNDANCE_COMMIT=c17505996a5405135d989334f45738903960bccf
 COPY --chmod=755 docker/build_sundance.sh /usr/local/bin/build_sundance.sh
 COPY docker/ /ctx/docker/
+COPY sources/ /ctx/sources/
 # Features: local-z3 (links libz3 4.13.4, for --arithmetic z3incremental) and minisat (for --sat-backend minisat)
 RUN build_sundance.sh "$SUNDANCE_REPO" "$SUNDANCE_COMMIT" local-z3,minisat
 # The Semper e-graph variant (RQ3): branch semper-egraph-minimal = main c175059 + the semper adapter

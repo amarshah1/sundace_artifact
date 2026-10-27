@@ -7,11 +7,14 @@ rebuild its tables and figures.
 ## Prerequisites
 
 - **Docker.** On macOS and Windows, use Docker Desktop. On Linux, you need Docker Engine with the `buildx` plugin, and your user in the `docker` group.
-- **Disk:**
-  - about 10 GB for the quick start
-  - about 80 GB of benchmarks plus 15 GB of results for the full evaluation
+- **Disk:** about 10 GB for building the image (about 7 GB of it is Docker's build cache, which
+  `docker builder prune` frees afterwards; the image itself is 0.7 GB); the quick start adds 35 MB. **The full evaluation needs about 100 GB**: 77 GB of
+  benchmarks and about 15 GB of results (mostly proofs).
 - **Memory:** a few GB per parallel query. A few queries need up to 10 GB, so on a laptop use `-j` of 4 or less.
-- **Time:** building the image takes 10–20 minutes (Sundance and Alt-Ergo are compiled from source).
+- **Time:** building the image takes 10–20 minutes (Sundance and Alt-Ergo are compiled from source). **We ran the
+  full evaluation with 150 queries in parallel** (on a machine with 192 hardware threads), where it takes about
+  8.5 hours. With fewer cores it takes proportionally longer: about 150/N times as long at `-j N`, so several
+  days on an 8-core machine.
 
 ## Quick start
 
@@ -22,16 +25,16 @@ docker buildx build --load -t sundance-artifact .
 # If you built the image under another name (VS Code's Docker extension, for example, suggests
 # sundanceartifactexperiment), rename it so that run.sh finds it:
 #   docker tag sundanceartifactexperiment sundance-artifact
-./run.sh fetch_benchmarks.sh --only verus --only heldout --only dafny_fstar --asset UFLIA-fs_vwasm.tar.xz /benchmarks
-./run.sh smoke_test.sh 5 10 4                     # 5 queries per set, 10 s timeout, 4 parallel jobs
+./run.sh fetch_benchmarks.sh --sample 5 /benchmarks # 5 queries per set
+./run.sh smoke_test.sh 5 10 4                     # those queries, 10 s timeout, 4 parallel jobs
 ./run.sh make_tables.sh /results/smoke_n5_t10     # tables from that run
 ./run.sh make_plots.sh /results/smoke_n5_t10      # figures from that run
 ```
 
 What you should see:
-- **Fetch:** the Verus and held-out Verus sets, plus the smallest Dafny/F\* tarball (F\* vWasm). Together they are about 7 GB.
-  - It ends with `Dafny/F*: partial download (1 of 5 tarballs)`. That is expected.
-  - The git clones show no progress for a minute or two.
+- **Fetch:** about a minute: 5 random queries (fixed seed) from each of Verus, held-out Verus, Dafny and F\*, out
+  of the paper's file lists. About 0.3 GB is downloaded (the Dafny and F\* queries are extracted from the two
+  smallest release tarballs), and 35 MB stays on disk. It ends with `Dafny/F*: 10 sampled queries (OK)`.
 - **Smoke test:** a few minutes, then one line per (benchmark set, config), for example `verus/z3-tool: unsat=5 total=5`.
   - `mariposa` is the Dafny/F\* set.
   - `unsat` means solved; `timeout` means no answer within the time limit.
@@ -68,6 +71,9 @@ prompt inside the shell may read `I have no name!`. That is harmless.
 | Dafny / F\* (`dafny_fstar`) | [amarshah1/dafny_fstar_benchmarks](https://github.com/amarshah1/dafny_fstar_benchmarks), release v1.0 | 11,674 Dafny + 3,195 F\* |
 
 ## Running the evaluations
+
+**The full evaluation needs about 100 GB of disk and was run with 150 queries in parallel (about 8.5 hours); on a
+machine with few cores it takes days.** Use `--sample N` to try a smaller version first.
 
 | eval | command | time* |
 |---|---|---|
@@ -150,14 +156,21 @@ open source yet; we are in the process of open-sourcing it. The proof configs st
 
 `sundance-smt --help` lists `z3incremental` as the default arithmetic, because this build links Z3. The configs always pass `--arithmetic` explicitly.
 
-## Sundance source
+## Sundance and Alt-Ergo source
 
-The image builds two Sundance binaries from [yaspar-org/Sundance-SMT](https://github.com/yaspar-org/Sundance-SMT):
+The image builds Sundance and Alt-Ergo from source snapshots shipped in `sources/` (with `SHA256SUMS`), so the
+build does not depend on those projects' repositories. The two Sundance binaries come from
+[yaspar-org/Sundance-SMT](https://github.com/yaspar-org/Sundance-SMT):
 
 | binary | branch | commit |
 |---|---|---|
 | `sundance-smt` | `main` | [`c175059`](https://github.com/yaspar-org/Sundance-SMT/commit/c17505996a5405135d989334f45738903960bccf) (2026-10-26, "Make the internal, incremental arithmetic solver the default (#247)") |
 | `sundance-smt-semper` | `semper-egraph-minimal` | [`5c15293`](https://github.com/yaspar-org/Sundance-SMT/commit/5c15293cd9404e319bdd149fde3c1c2ed13ed721) (2026-10-27, main `c175059` plus the Semper adapter) |
+
+The snapshots are `sources/Sundance-SMT-c17505996a54.tar.gz` and `sources/Sundance-SMT-5c15293cd940.tar.gz`
+(`git archive` of those commits, without history). Alt-Ergo is `sources/alt-ergo-2.4.3-free.tar.gz`, the
+[2.4.3-free release](https://github.com/OCamlPro/alt-ergo/releases/tag/v2.4.3-free). Building another Sundance commit
+(`--build-arg SUNDANCE_COMMIT=…`) clones it from GitHub instead.
 
 ## Contents of the image
 
