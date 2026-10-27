@@ -140,8 +140,8 @@ added. 60 s per query.
 | `alt-ergo` | `alt-ergo --timelimit=60 PREP`. PREP is FILE rewritten by `prep_smtlib.py --legacy-ae` (untimed) so that Alt-Ergo 2.4.3 can parse it |
 
 Semper is built from a separate branch of the Sundance repository (`semper-egraph-minimal`) because the Semper
-e-graph integration is not yet in Sundance's main branch. Supporting Semper is a minor, performance-oriented
-modification: the branch is main plus the Semper adapter (a new module behind Sundance's e-graph interface, compiled
+e-graph integration is not yet in Sundance's main branch. Supporting Semper is a minor modification: the branch
+is main plus the Semper adapter (a new module behind Sundance's e-graph interface, compiled
 only with the `semper-egraph` feature) and about 80 lines of small changes elsewhere.
 
 **Proof checking is not evaluated.** The paper checks Sundance's proofs with the proof checker Valido, which is not
@@ -149,6 +149,15 @@ open source yet; we are in the process of open-sourcing it. The proof configs st
 `results/<run>/proofs/`.
 
 `sundance-smt --help` lists `z3incremental` as the default arithmetic, because this build links Z3. The configs always pass `--arithmetic` explicitly.
+
+## Sundance source
+
+The image builds two Sundance binaries from [yaspar-org/Sundance-SMT](https://github.com/yaspar-org/Sundance-SMT):
+
+| binary | branch | commit |
+|---|---|---|
+| `sundance-smt` | `main` | [`c175059`](https://github.com/yaspar-org/Sundance-SMT/commit/c17505996a5405135d989334f45738903960bccf) (2026-10-26, "Make the internal, incremental arithmetic solver the default (#247)") |
+| `sundance-smt-semper` | `semper-egraph-minimal` | [`5c15293`](https://github.com/yaspar-org/Sundance-SMT/commit/5c15293cd9404e319bdd149fde3c1c2ed13ed721) (2026-10-27, main `c175059` plus the Semper adapter) |
 
 ## Contents of the image
 
