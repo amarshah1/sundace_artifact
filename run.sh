@@ -5,6 +5,15 @@
 # ./benchmarks is mounted read-only, except for fetch_benchmarks.sh, which writes to it.
 # Override with SUNDANCE_IMAGE (default sundance-artifact), BENCH_DIR, RESULTS_DIR.
 set -euo pipefail
+if [ -f /artifact/README.md ] && ! command -v docker > /dev/null; then
+  cat >&2 <<'MSG'
+run.sh starts the artifact's container, and you are already inside it.
+- Here, run commands directly, e.g.:  smoke_test.sh 5 10 4    make_paper_tables.sh    count_supported.py
+- To download benchmarks, type `exit` and run on your machine:  ./run.sh fetch_benchmarks.sh ... /benchmarks
+  (in this shell /benchmarks is read-only)
+MSG
+  exit 1
+fi
 here=$(cd "$(dirname "$0")" && pwd)
 image=${SUNDANCE_IMAGE:-sundance-artifact}
 bench=${BENCH_DIR:-$here/benchmarks}

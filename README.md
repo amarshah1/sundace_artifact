@@ -57,7 +57,9 @@ What you should see:
   - Dafny/F\* queries need `sundance-smt --infer-triggers`.
 - To use other folders or another image, set `BENCH_DIR`, `RESULTS_DIR` or `SUNDANCE_IMAGE`.
 
-The prompt inside the shell may read `I have no name!`. That is harmless.
+Run `./run.sh` on your machine, not inside the container's shell: in the shell, run commands directly (for example
+`smoke_test.sh 5 10 4`), and download benchmarks from outside (in the shell, `/benchmarks` is read-only). The
+prompt inside the shell may read `I have no name!`. That is harmless.
 
 ## Benchmarks
 
