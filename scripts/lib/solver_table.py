@@ -5,7 +5,7 @@ subproject, for the series in the clean CDF plots. Same query filtering as plot_
 (manifests, 1,187 duplicate anvil/splinterdb-smt-* Verus queries dropped), plus a Verus table on
 all 3,763 files. Lines are prefixed with "% " so they can be pasted into LaTeX as comments.
 
---modularity-ablation tabulates the Sundance modularity ablation instead (Default, Semper if run, MiniSat,
+--modularity-ablation tabulates the Sundance modularity ablation instead (Default, Semper, MiniSat,
 Z3 arithmetic).
 
 Usage: solver_table.py [--root RUN_DIR] [--sundance CFG | --modularity-ablation] [--out FILE]
@@ -36,7 +36,7 @@ ABLATION_HEADER = [
     "Sundance modularity ablation: queries solved (unsat within 1 s / 10 s / 60 s of wall time)",
     "Each variant swaps one component of Default; eDRAT proofs; --infer-triggers on Dafny/F*.",
     "  Default (proofs)        --arithmetic internalincremental, CaDiCaL, Sundance e-graph",
-    "  Semper (proofs)         Semper e-graph (not on Sundance main yet; shown only if its results exist)",
+    "  Semper (proofs)         Default with the Semper e-graph (separate build: branch semper-egraph-minimal)",
     "  MiniSat                 Default with --sat-backend minisat (no proofs: the MiniSat backend has no proof tracer)",
     "  Z3 arithmetic (proofs)  Default with --arithmetic z3incremental (Z3's incremental arithmetic)",
 ]

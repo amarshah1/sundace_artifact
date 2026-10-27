@@ -12,7 +12,7 @@ given Sundance config as the Sundance line, legend inside the plot (default out:
 
 Usage: plot_cdf_clean.py [--root RUN_DIR] [--manifests DIR] [--out DIR] [--keep-duplicates]
                          [--sundance-only | --sundance-238fix | --sundance CFG]
---modularity-ablation (alias --sundance-238fix) plots the modularity ablation: Default, Semper (if run), MiniSat and
+--modularity-ablation (alias --sundance-238fix) plots the modularity ablation: Default, Semper, MiniSat and
 Z3 arithmetic; out: plots/modularity_ablation.
 """
 import argparse

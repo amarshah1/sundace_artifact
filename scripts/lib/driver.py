@@ -6,7 +6,7 @@ differences as the paper's run; Sundance is a single build whose configurations 
 Suites:
   solvers           RQ1/RQ2: Sundance (Default), Z3 (tool options), Z3 (tool options, proofs),
                     cvc5 --no-cbqi --user-pat=strict (proofs), Alt-Ergo
-  sundance-configs  RQ3: Default, MiniSat, Z3 arithmetic (Semper: not on Sundance main yet)
+  sundance-configs  RQ3: Default, Semper e-graph (separate build), MiniSat, Z3 arithmetic
 
 Benchmark sets (under --bench-root, as created by fetch_benchmarks.sh):
   verus          verus_benchmarks/UFDTLIA/20241211-verus      (3,763 files; tables drop the 1,187 duplicates)
@@ -45,19 +45,23 @@ PREP = str(HERE / "prep_smtlib.py")
 CVC5_PROOF = "--produce-proofs --dump-proofs --proof-format-mode=cpc --proof-granularity=dsl-rewrite"
 CVC5_STRICT = "--no-cbqi --user-pat=strict"
 
-# Sundance configurations: one binary (built from github.com/yaspar-org/Sundance-SMT), modules picked by flags.
-# (config name, flags, produces proofs, label). --infer-triggers is added on Dafny/F*.
-SUNDANCE = SUNDANCE_BIN / "sundance-smt"
+# Sundance configurations, built from github.com/yaspar-org/Sundance-SMT. Default, MiniSat and Z3 arithmetic are
+# flags of one binary; the Semper e-graph is a compile-time feature, so it has its own binary.
+SUNDANCE = SUNDANCE_BIN / "sundance-smt"               # Sundance main
+SUNDANCE_SEMPER = SUNDANCE_BIN / "sundance-smt-semper"  # branch semper-egraph-minimal, feature semper-egraph
+# (config name: binary, flags, produces proofs, label). --infer-triggers is added on Dafny/F*.
 SUNDANCE_VARIANTS = {
-    "sundance-default-proof": (["--arithmetic", "internalincremental"], True, "Sundance / Default (proofs)"),
-    "sundance-sat-minisat":   (["--arithmetic", "internalincremental", "--sat-backend", "minisat"], False,
-                               "MiniSat (no proofs: the MiniSat backend has no proof tracer)"),
-    "sundance-arith-z3-proof": (["--arithmetic", "z3incremental"], True, "Z3 arithmetic (proofs)"),
-    # Semper e-graph: not on Sundance main yet; add its config here once it is.
+    "sundance-default-proof": (SUNDANCE, ["--arithmetic", "internalincremental"], True, "Sundance / Default (proofs)"),
+    "sundance-egraph-semper-proof": (SUNDANCE_SEMPER, ["--arithmetic", "internalincremental"], True,
+                                     "Semper e-graph (proofs)"),
+    "sundance-sat-minisat": (SUNDANCE, ["--arithmetic", "internalincremental", "--sat-backend", "minisat"], False,
+                             "MiniSat (no proofs: the MiniSat backend has no proof tracer)"),
+    "sundance-arith-z3-proof": (SUNDANCE, ["--arithmetic", "z3incremental"], True, "Z3 arithmetic (proofs)"),
 }
 SUITES = {
     "solvers": ["sundance-default-proof", "z3-tool", "z3-tool-proof", "cvc5-nocbqi-strict-proof", "alt-ergo"],
-    "sundance-configs": ["sundance-default-proof", "sundance-sat-minisat", "sundance-arith-z3-proof"],
+    "sundance-configs": ["sundance-default-proof", "sundance-egraph-semper-proof", "sundance-sat-minisat",
+                         "sundance-arith-z3-proof"],
 }
 ALIASES = {"heldout": "verus_heldout", "dafny_fstar": "mariposa"}   # the names fetch_benchmarks.sh uses
 BENCHES = {  # name -> (path under bench root, family)
@@ -70,9 +74,9 @@ BENCHES = {  # name -> (path under bench root, family)
 def config(name, family):
     """(run_solver.py args, produces proofs) for one config on one benchmark family."""
     if name in SUNDANCE_VARIANTS:
-        flags, proofs, _ = SUNDANCE_VARIANTS[name]
+        binary, flags, proofs, _ = SUNDANCE_VARIANTS[name]
         flags = (["--infer-triggers"] if family == "mariposa" else []) + flags   # Dafny/F* lack patterns
-        args = ["--kind=sundance", f"--solver={SUNDANCE}"]
+        args = ["--kind=sundance", f"--solver={binary}"]
         if flags:
             args.append(f"--sundance-flags={' '.join(flags)}")
         return args, proofs
@@ -121,7 +125,7 @@ PROBE = "(declare-fun x () Int)\n(assert (> x 0))\n(assert (< x 0))\n(check-sat)
 
 
 def executable(name):
-    return str(SUNDANCE) if name in SUNDANCE_VARIANTS else {
+    return str(SUNDANCE_VARIANTS[name][0]) if name in SUNDANCE_VARIANTS else {
         "z3-tool": Z3, "z3-tool-proof": Z3, "cvc5-nocbqi-strict-proof": CVC5, "alt-ergo": ALTERGO}[name]
 
 

@@ -74,7 +74,7 @@ The prompt inside the shell may read `I have no name!`. That is harmless.
 | eval | command | time* |
 |---|---|---|
 | Solver comparison (RQ1/RQ2) | `./run.sh run_all_solvers.sh --manifests /artifact/manifests/paper -j N` | ~4.5 h |
-| Sundance configurations (RQ3) | `./run.sh run_sundance_configs.sh --manifests /artifact/manifests/paper -j N` | ~3 h more |
+| Sundance configurations (RQ3) | `./run.sh run_sundance_configs.sh --manifests /artifact/manifests/paper -j N` | ~4 h more |
 | Tables and figures | `./run.sh make_tables.sh` and `./run.sh make_plots.sh` → `results/paper/{tables,plots}/` | seconds |
 | Supported fraction (91.3% / 93.0% / 97.1%) | `./run.sh count_supported.py` (counts the file lists of the benchmark repos, including the queries Sundance does not support, which are not downloaded) | seconds |
 | Lines of code (13,612 / 519,367 / 358,294) | `./run.sh count_lines.sh --paper` (needs network; clones into `results/loc_count/`) | ~1 min |
@@ -102,11 +102,14 @@ Options of `run_all_solvers.sh` and `run_sundance_configs.sh` (see `--help`):
 
 ## Configurations
 
-All Sundance configs use the same binary. On Dafny/F\*, `--infer-triggers` is added. 60 s per query.
+Each Sundance config swaps one component of Default. The Semper e-graph is a compile-time feature, so it has its own
+binary (`sundance-smt-semper`); the other configs are flags of `sundance-smt`. On Dafny/F\*, `--infer-triggers` is
+added. 60 s per query.
 
 | config | command |
 |---|---|
 | `sundance-default-proof` | `sundance-smt --arithmetic internalincremental --stats FILE --proof=P --timeout=60` |
+| `sundance-egraph-semper-proof` | `sundance-smt-semper --arithmetic internalincremental --stats FILE --proof=P --timeout=60` |
 | `sundance-sat-minisat` | `sundance-smt --arithmetic internalincremental --sat-backend minisat --stats FILE --timeout=60` (no proofs) |
 | `sundance-arith-z3-proof` | `sundance-smt --arithmetic z3incremental --stats FILE --proof=P --timeout=60` |
 | `z3-tool`, `z3-tool-proof` | `z3 [proof=true] --st [Verus: options from the file's :source header] FILE -t:60000` |
@@ -121,10 +124,11 @@ All Sundance configs use the same binary. On Dafny/F\*, `--infer-triggers` is ad
 |---|---|
 | `/opt/sundance/bin/sundance-smt` | Sundance at `SUNDANCE_COMMIT` (default: main `c175059`). Features `local-z3,minisat`. Dependencies are pinned by `docker/Cargo.lock.<commit>`. Build info is in `/opt/sundance/info/` |
 | `/opt/solvers/{z3-5.3.0,cvc5-1.4.2,alt-ergo-2.4.3-free}` | Z3 5.3.0, cvc5 1.4.2 (static), and Alt-Ergo 2.4.3 (alt-ergo-free, built with opam on OCaml 5.2.1), with their licenses |
+| `/opt/sundance/bin/sundance-smt-semper` | Sundance with the Semper e-graph: branch `semper-egraph-minimal` (`5c15293`, main `c175059` plus the Semper adapter), features `local-z3,minisat,semper-egraph`, rustc 1.98.1. Dependencies pinned by `docker/Cargo.lock.5c15293cd940` |
 | `/opt/z3-4.13.4` | libz3 4.13.4, linked into Sundance for `--arithmetic z3incremental` |
 | `/artifact/scripts`, `/artifact/manifests`, `/artifact/paper_results` | the scripts, the paper's file lists, and the paper's per-query results |
 
-To build another Sundance commit, run `docker buildx build --load --build-arg SUNDANCE_COMMIT=<commit> -t sundance-artifact .`. Without a matching `docker/Cargo.lock.<commit>`, its dependencies are resolved at build time.
+To build other Sundance commits, run `docker buildx build --load --build-arg SUNDANCE_COMMIT=<commit> --build-arg SUNDANCE_SEMPER_COMMIT=<commit> -t sundance-artifact .`. Without a matching `docker/Cargo.lock.<commit>`, its dependencies are resolved at build time.
 
 ## Architectures
 
@@ -133,12 +137,6 @@ The image builds for `linux/amd64` and `linux/arm64`, for example Apple Silicon 
 - Z3 and cvc5 are the official release builds for that architecture.
 
 The paper's numbers were measured on amd64. On a Mac, give Docker Desktop at least 4 CPUs and 8 GB of memory (Settings > Resources).
-
-## Differences from the paper's run
-
-- **Sundance build.** The paper measured local builds of Sundance that were later merged into main. This image builds main `c175059`, which adds a few commits, such as `preprocess_abs` (#242). On 250-query samples of the Verus sets, the two give the same solved counts within one query.
-- **Semper.** The Semper e-graph variant (RQ3) is not on Sundance main yet, so it cannot be rerun here. Its results are in `paper_results/`, and `make_paper_tables.sh` includes it.
-- **Not included:** SMTInterpol, and checking Sundance's proofs.
 
 ## Licenses
 
@@ -149,3 +147,7 @@ The paper's numbers were measured on amd64. On a Mac, give Docker Desktop at lea
 | cvc5 | BSD-3 |
 | Alt-Ergo (alt-ergo-free) | CeCILL-C |
 | Benchmarks | CC BY 4.0 |
+
+## Acknowledgments
+
+This artifact was created with the help of Claude Opus 5.5.

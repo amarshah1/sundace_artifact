@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# RQ3 (Fig. eval-modules): Sundance's modularity ablation, 60 s per query, all three sets. One Sundance build;
-# each config swaps one component with a flag (--infer-triggers is added on Dafny/F*):
-#   sundance-default-proof   --arithmetic internalincremental                         (CaDiCaL, proofs)
-#   sundance-sat-minisat     --arithmetic internalincremental --sat-backend minisat   (no proofs)
-#   sundance-arith-z3-proof  --arithmetic z3incremental                               (proofs)
-# Semper (the e-graph swap) is not on Sundance main yet.
+# RQ3 (Fig. eval-modules): Sundance's modularity ablation, 60 s per query, all three sets. Each config swaps one
+# component of Default (--infer-triggers is added on Dafny/F*):
+#   sundance-default-proof        sundance-smt        --arithmetic internalincremental                        (proofs)
+#   sundance-egraph-semper-proof  sundance-smt-semper --arithmetic internalincremental                        (proofs)
+#   sundance-sat-minisat          sundance-smt        --arithmetic internalincremental --sat-backend minisat  (no proofs)
+#   sundance-arith-z3-proof       sundance-smt        --arithmetic z3incremental                              (proofs)
+# sundance-smt-semper is the semper-egraph-minimal branch built with the semper-egraph feature.
 DRIVER_PROG=run_sundance_configs.sh exec python3 "$(dirname "$0")/lib/driver.py" --suite sundance-configs "$@"

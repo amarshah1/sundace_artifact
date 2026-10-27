@@ -93,7 +93,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
         ca-certificates curl git build-essential pkg-config clang libclang-dev cmake zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 ENV RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo PATH=/opt/cargo/bin:$PATH
-RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0
+# rustc 1.96.0 for Sundance main; 1.98.1 for the Semper build (its semi-persistent-egraph dependency needs it)
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 \
+ && rustup toolchain install 1.98.1 --profile minimal
 COPY --from=solvers /opt/z3-4.13.4 /opt/z3-4.13.4
 ARG SUNDANCE_REPO=https://github.com/yaspar-org/Sundance-SMT.git
 # Latest main at the time of writing (2026-10-26, #247). Override with --build-arg SUNDANCE_COMMIT=<commit>.
@@ -102,6 +104,10 @@ COPY --chmod=755 docker/build_sundance.sh /usr/local/bin/build_sundance.sh
 COPY docker/ /ctx/docker/
 # Features: local-z3 (links libz3 4.13.4, for --arithmetic z3incremental) and minisat (for --sat-backend minisat)
 RUN build_sundance.sh "$SUNDANCE_REPO" "$SUNDANCE_COMMIT" local-z3,minisat
+# The Semper e-graph variant (RQ3): branch semper-egraph-minimal = main c175059 + the semper adapter
+# (cargo feature semper-egraph). Used only by the config sundance-egraph-semper-proof.
+ARG SUNDANCE_SEMPER_COMMIT=5c15293cd9404e319bdd149fde3c1c2ed13ed721
+RUN build_sundance.sh "$SUNDANCE_REPO" "$SUNDANCE_SEMPER_COMMIT" local-z3,minisat,semper-egraph sundance-smt-semper 1.98.1
 
 ###############################################################################
 # tokei 15.0.0: the line counter used for the paper's LoC numbers
