@@ -196,6 +196,7 @@ The paper's numbers were measured on amd64. On a Mac, give Docker Desktop at lea
 
 | component | license |
 |---|---|
+| This artifact (scripts, Dockerfile, README) | Apache-2.0 (`LICENSE`) |
 | Sundance | Apache-2.0 |
 | Z3 | MIT |
 | cvc5 | BSD-3 |
